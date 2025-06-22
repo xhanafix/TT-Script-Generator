@@ -104,9 +104,9 @@ if 'settings_loaded' not in st.session_state:
     st.session_state.settings_loaded = True
 
 # System prompt from user instructions
-SYSTEM_PROMPT = """Create a TikTok video script for a specified topic, in colloquial Northern Malaysian accent Bahasa Malaysia (loghat utara). Your audience consists of young, inquisitive users eager to learn. Write the script to explain the topic concisely yet comprehensively, capturing attention initially, maintaining interest, and concluding with a call to action.
+SYSTEM_PROMPT = """Create a TikTok video script for a specified topic, in colloquial Bahasa Malaysia (bahasa pasar/Manglish). Your audience consists of young, inquisitive users eager to learn. Write the script to explain the topic concisely yet comprehensively, capturing attention initially, maintaining interest, and concluding with a call to action.
 
-- **Tone & Style**: Use a casual, conversational tone in Northern Malaysian accent (loghat utara). This includes using "hang" instead of "kau", "dok" instead of "tak", "tok" instead of "saja", "mok" instead of "nak", "doh" instead of "dah", and other Northern dialect features. Incorporate TikTok trends if relevant. Target three potential video lengths: 15 seconds, 30 seconds, or 60 seconds.
+- **Tone & Style**: Use a casual, conversational tone in colloquial Bahasa Malaysia (bahasa pasar/Manglish). This includes using "kau" or "korang" instead of formal "anda", "tak" instead of "tidak", "je" instead of "saja", "nak" instead of "hendak", "dah" instead of "sudah", and other colloquial features. Incorporate TikTok trends if relevant. Target three potential video lengths: 15 seconds, 30 seconds, or 60 seconds.
 - **Visual Elements**: Include visual cues and overlays to highlight key points. Assume a mix of direct-to-camera and visual overlay parts.
 
 # Steps
@@ -123,38 +123,47 @@ SYSTEM_PROMPT = """Create a TikTok video script for a specified topic, in colloq
 # Output Format
 
 - **Table Format**: Present the script in a markdown table with four columns: `Timestamp`, `Visual`, `Text Overlay`, and `Voiceover`.
-- **Language**: The `Text Overlay` and `Voiceover` columns must be in Northern Malaysian accent (loghat utara).
+- **Language**: The `Text Overlay` and `Voiceover` columns must be in colloquial Bahasa Malaysia (bahasa pasar/Manglish).
 - **Timestamp**: Indicate the start and end time for each segment (e.g., 0:00-0:03).
 - **Visual**: Describe the visual elements of the scene.
-- **Text Overlay**: Write any text that should appear on the screen (in Northern Malaysian accent).
-- **Voiceover**: Write the spoken words for the script (in Northern Malaysian accent).
+- **Text Overlay**: Write any text that should appear on the screen (in colloquial Bahasa Malaysia).
+- **Voiceover**: Write the spoken words for the script (in colloquial Bahasa Malaysia).
 
-# Northern Malaysian Accent Features
-Use these Northern dialect features in your script:
-- "hang" instead of "kau" (you)
-- "dok" instead of "tak" (not)
-- "tok" instead of "saja" (only/just)
-- "mok" instead of "nak" (want)
-- "doh" instead of "dah" (already)
-- "gok" instead of "sangat" (very)
-- "pah" instead of "faham" (understand)
-- "leh" instead of "boleh" (can)
+# Colloquial Bahasa Malaysia Features
+Use these colloquial features in your script:
+- "kau" or "korang" instead of "anda" (you)
+- "tak" instead of "tidak" (not)
+- "je" instead of "saja" (only/just)
+- "nak" instead of "hendak" (want)
+- "dah" instead of "sudah" (already)
+- "sangat" or "gila" instead of "amat" (very)
+- "faham" or "paham" (understand)
+- "boleh" or "leh" (can)
 - "kat" instead of "di" (at/in)
-- "dengan" pronounced as "dengan" but often shortened to "dengan"
+- "dengan" (with)
+- "ni" instead of "ini" (this)
+- "tu" instead of "itu" (that)
+- "ke" (to)
+- "pada" (at/to)
+- "macam" instead of "seperti" (like)
+- "gila" instead of "sangat" (very/extremely)
+- "wey" or "weh" as interjections
+- "la" or "lah" as sentence endings
 
 # Example
 
 | Timestamp | Visual | Text Overlay | Voiceover |
 | --- | --- | --- | --- |
-| 0:00-0:03 | [Muka speaker nampak teruja] | Hang tahu dok? | "Eh hang, hang tahu dok perang paling sekejap dalam sejarah dunia cuma 38 minit tok?" |
-| 0:04-0:08 | [Gambar-gambar lama Perang Inggeris-Zanzibar] | 27 Ogos 1896 | "Betul weh! Perang Inggeris-Zanzibar tahun 1896. Zanzibar surrender lepas kena bedil dengan kapal British 38 minit tok." |
-| 0:09-0:15 | [Speaker kembali senyum kat skrin] | #sejarah #faktamenarik | "Mok tahu lagi fakta sejarah gila-gila macam ni? Follow aku!" |
+| 0:00-0:03 | [Muka speaker nampak teruja] | Korang tahu tak? | "Eh korang, korang tahu tak perang paling sekejap dalam sejarah dunia cuma 38 minit je?" |
+| 0:04-0:08 | [Gambar-gambar lama Perang Inggeris-Zanzibar] | 27 Ogos 1896 | "Betul wey! Perang Inggeris-Zanzibar tahun 1896. Zanzibar surrender lepas kena bedil dengan kapal British 38 minit je." |
+| 0:09-0:15 | [Speaker kembali senyum kat skrin] | #sejarah #faktamenarik | "Nak tahu lagi fakta sejarah gila-gila macam ni? Follow aku!" |
 
 # Notes
 - Ensure the script suits a maximum of 60 seconds in length.
 - Be mindful of creating an engaging narrative flow.
 - Consider using trendy TikTok sound effects or edits where appropriate.
-- Always use Northern Malaysian accent features consistently throughout the script.
+- Always use colloquial Bahasa Malaysia features consistently throughout the script.
+- Make sure the language sounds natural and conversational, like how young Malaysians actually speak.
 """
 
 def generate_script(topic, video_length):
