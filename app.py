@@ -3,8 +3,14 @@ import openai
 import google.generativeai as genai
 import json
 import os
+import pandas as pd
+from datetime import datetime
 
 SETTINGS_FILE = "settings.json"
+
+# Initialize session state for history
+if 'script_history' not in st.session_state:
+    st.session_state.script_history = []
 
 # --- Settings Functions ---
 def load_settings():
@@ -23,6 +29,72 @@ def save_settings(settings):
     with open(SETTINGS_FILE, 'w') as f:
         json.dump(settings, f, indent=4)
 
+def add_to_history(topic, video_length, script, timestamp=None):
+    """Adds a generated script to history."""
+    if timestamp is None:
+        timestamp = datetime.now()
+    
+    history_item = {
+        'timestamp': timestamp,
+        'topic': topic,
+        'video_length': video_length,
+        'script': script
+    }
+    st.session_state.script_history.append(history_item)
+
+def create_excel_file(script, topic, video_length):
+    """Creates Excel file content from script."""
+    try:
+        # Parse the markdown table to extract data
+        lines = script.strip().split('\n')
+        table_data = []
+        headers = []
+        
+        for line in lines:
+            if line.startswith('|') and line.endswith('|'):
+                # Remove leading/trailing | and split
+                cells = [cell.strip() for cell in line[1:-1].split('|')]
+                if '---' not in line:  # Skip separator lines
+                    if not headers:
+                        headers = cells
+                    else:
+                        table_data.append(cells)
+        
+        # Create DataFrame
+        df = pd.DataFrame(table_data, columns=headers)
+        
+        # Create Excel file in memory
+        output = pd.ExcelWriter('temp.xlsx', engine='openpyxl')
+        df.to_excel(output, sheet_name='Script', index=False)
+        
+        # Auto-adjust column widths
+        worksheet = output.sheets['Script']
+        for column in worksheet.columns:
+            max_length = 0
+            column_letter = column[0].column_letter
+            for cell in column:
+                try:
+                    if len(str(cell.value)) > max_length:
+                        max_length = len(str(cell.value))
+                except:
+                    pass
+                adjusted_width = min(max_length + 2, 50)
+                worksheet.column_dimensions[column_letter].width = adjusted_width
+        
+        output.close()
+        
+        # Read the file and return its content
+        with open('temp.xlsx', 'rb') as f:
+            file_content = f.read()
+        
+        # Clean up temp file
+        os.remove('temp.xlsx')
+        
+        return file_content
+    except Exception as e:
+        st.error(f"Error creating Excel file: {e}")
+        return None
+
 # Load existing settings and store them in session state
 if 'settings_loaded' not in st.session_state:
     settings = load_settings()
@@ -32,9 +104,9 @@ if 'settings_loaded' not in st.session_state:
     st.session_state.settings_loaded = True
 
 # System prompt from user instructions
-SYSTEM_PROMPT = """Create a TikTok video script for a specified topic, in colloquial Bahasa Malaysia. Your audience consists of young, inquisitive users eager to learn. Write the script to explain the topic concisely yet comprehensively, capturing attention initially, maintaining interest, and concluding with a call to action.
+SYSTEM_PROMPT = """Create a TikTok video script for a specified topic, in colloquial Northern Malaysian accent Bahasa Malaysia (loghat utara). Your audience consists of young, inquisitive users eager to learn. Write the script to explain the topic concisely yet comprehensively, capturing attention initially, maintaining interest, and concluding with a call to action.
 
-- **Tone & Style**: Use a casual, conversational tone in colloquial Bahasa Malaysia (Manglish/bahasa pasar). Incorporate TikTok trends if relevant. Target three potential video lengths: 15 seconds, 30 seconds, or 60 seconds.
+- **Tone & Style**: Use a casual, conversational tone in Northern Malaysian accent (loghat utara). This includes using "hang" instead of "kau", "dok" instead of "tak", "tok" instead of "saja", "mok" instead of "nak", "doh" instead of "dah", and other Northern dialect features. Incorporate TikTok trends if relevant. Target three potential video lengths: 15 seconds, 30 seconds, or 60 seconds.
 - **Visual Elements**: Include visual cues and overlays to highlight key points. Assume a mix of direct-to-camera and visual overlay parts.
 
 # Steps
@@ -51,34 +123,48 @@ SYSTEM_PROMPT = """Create a TikTok video script for a specified topic, in colloq
 # Output Format
 
 - **Table Format**: Present the script in a markdown table with four columns: `Timestamp`, `Visual`, `Text Overlay`, and `Voiceover`.
-- **Language**: The `Text Overlay` and `Voiceover` columns must be in colloquial Bahasa Malaysia.
+- **Language**: The `Text Overlay` and `Voiceover` columns must be in Northern Malaysian accent (loghat utara).
 - **Timestamp**: Indicate the start and end time for each segment (e.g., 0:00-0:03).
 - **Visual**: Describe the visual elements of the scene.
-- **Text Overlay**: Write any text that should appear on the screen (in Bahasa Malaysia).
-- **Voiceover**: Write the spoken words for the script (in colloquial Bahasa Malaysia).
+- **Text Overlay**: Write any text that should appear on the screen (in Northern Malaysian accent).
+- **Voiceover**: Write the spoken words for the script (in Northern Malaysian accent).
+
+# Northern Malaysian Accent Features
+Use these Northern dialect features in your script:
+- "hang" instead of "kau" (you)
+- "dok" instead of "tak" (not)
+- "tok" instead of "saja" (only/just)
+- "mok" instead of "nak" (want)
+- "doh" instead of "dah" (already)
+- "gok" instead of "sangat" (very)
+- "pah" instead of "faham" (understand)
+- "leh" instead of "boleh" (can)
+- "kat" instead of "di" (at/in)
+- "dengan" pronounced as "dengan" but often shortened to "dengan"
 
 # Example
 
 | Timestamp | Visual | Text Overlay | Voiceover |
 | --- | --- | --- | --- |
-| 0:00-0:03 | [Muka speaker nampak teruja] | Korang tahu tak? | "Eh, korang tahu tak perang paling sekejap dalam sejarah dunia cuma 38 minit je?" |
-| 0:04-0:08 | [Gambar-gambar lama Perang Inggeris-Zanzibar] | 27 Ogos 1896 | "Betul weh! Perang Inggeris-Zanzibar tahun 1896. Zanzibar surrender lepas kena bedil dengan kapal British 38 minit je." |
-| 0:09-0:15 | [Speaker kembali senyum kat skrin] | #sejarah #faktamenarik | "Nak tahu lagi fakta sejarah gila-gila macam ni? Follow aku!" |
+| 0:00-0:03 | [Muka speaker nampak teruja] | Hang tahu dok? | "Eh hang, hang tahu dok perang paling sekejap dalam sejarah dunia cuma 38 minit tok?" |
+| 0:04-0:08 | [Gambar-gambar lama Perang Inggeris-Zanzibar] | 27 Ogos 1896 | "Betul weh! Perang Inggeris-Zanzibar tahun 1896. Zanzibar surrender lepas kena bedil dengan kapal British 38 minit tok." |
+| 0:09-0:15 | [Speaker kembali senyum kat skrin] | #sejarah #faktamenarik | "Mok tahu lagi fakta sejarah gila-gila macam ni? Follow aku!" |
 
 # Notes
 - Ensure the script suits a maximum of 60 seconds in length.
 - Be mindful of creating an engaging narrative flow.
 - Consider using trendy TikTok sound effects or edits where appropriate.
+- Always use Northern Malaysian accent features consistently throughout the script.
 """
 
 def generate_script(topic, video_length):
     """Generates the TikTok script using the configured AI provider."""
     if not st.session_state.get("api_key"):
         st.error("Please enter your API key in the Settings tab.")
-        return None
+        return None, False
     if not st.session_state.get("model"):
         st.error("Please configure the model in the Settings tab.")
-        return None
+        return None, False
 
     try:
         provider = st.session_state.api_provider
@@ -97,7 +183,9 @@ def generate_script(topic, video_length):
                 ],
                 temperature=0.7,
             )
-            return response.choices[0].message.content
+            script = response.choices[0].message.content
+            add_to_history(topic, video_length, script)
+            return script, True
         
         elif provider == "OpenRouter":
             client = openai.OpenAI(
@@ -116,21 +204,25 @@ def generate_script(topic, video_length):
                     "X-Title": "TikTok Script Generator" 
                 }
             )
-            return response.choices[0].message.content
+            script = response.choices[0].message.content
+            add_to_history(topic, video_length, script)
+            return script, True
 
         elif provider == "Gemini":
             genai.configure(api_key=api_key)
             model = genai.GenerativeModel(model_name)
             full_prompt = f"{SYSTEM_PROMPT}\n\n---\n\n{user_prompt}"
             response = model.generate_content(full_prompt)
-            return response.text
+            script = response.text
+            add_to_history(topic, video_length, script)
+            return script, True
 
     except Exception as e:
         st.error(f"An error occurred: {e}")
-        return None
+        return None, False
 
 # --- UI Setup ---
-tab_generator, tab_settings = st.tabs(["Script Generator", "Settings"])
+tab_generator, tab_history, tab_settings = st.tabs(["Script Generator", "History", "Settings"])
 
 with tab_generator:
     st.title("TikTok Script Generator")
@@ -142,10 +234,62 @@ with tab_generator:
             st.warning("Please enter a topic.")
         else:
             with st.spinner("Generating your script..."):
-                script = generate_script(topic, video_length)
+                script, success = generate_script(topic, video_length)
                 if script:
                     st.subheader("Your TikTok Script:")
                     st.markdown(script)
+                    
+                    # Export functionality
+                    st.subheader("Export to Excel:")
+                    excel_content = create_excel_file(script, topic, video_length)
+                    if excel_content:
+                        filename = f"tiktok_script_{topic.replace(' ', '_')}_{video_length}s_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+                        st.download_button(
+                            label="📥 Download Excel File",
+                            data=excel_content,
+                            file_name=filename,
+                            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                        )
+
+with tab_history:
+    st.title("Generated Scripts History")
+    
+    if not st.session_state.script_history:
+        st.info("No scripts generated yet. Generate your first script in the Script Generator tab!")
+    else:
+        # Show history in reverse chronological order
+        for i, item in enumerate(reversed(st.session_state.script_history)):
+            with st.expander(f"📝 {item['topic']} ({item['video_length']}s) - {item['timestamp'].strftime('%Y-%m-%d %H:%M:%S')}"):
+                st.markdown(f"**Topic:** {item['topic']}")
+                st.markdown(f"**Length:** {item['video_length']} seconds")
+                st.markdown(f"**Generated:** {item['timestamp'].strftime('%Y-%m-%d %H:%M:%S')}")
+                st.markdown("---")
+                st.markdown(item['script'])
+                
+                # Export functionality
+                st.subheader("Export to Excel:")
+                excel_content = create_excel_file(item['script'], item['topic'], item['video_length'])
+                if excel_content:
+                    filename = f"tiktok_script_{item['topic'].replace(' ', '_')}_{item['video_length']}s_{item['timestamp'].strftime('%Y%m%d_%H%M%S')}.xlsx"
+                    st.download_button(
+                        label="📥 Download Excel File",
+                        data=excel_content,
+                        file_name=filename,
+                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                        key=f"download_history_{i}"
+                    )
+                
+                # Delete functionality
+                if st.button(f"🗑️ Delete Script", key=f"delete_history_{i}"):
+                    # Remove from history (accounting for reversed order)
+                    actual_index = len(st.session_state.script_history) - 1 - i
+                    st.session_state.script_history.pop(actual_index)
+                    st.rerun()
+        
+        # Clear all history button
+        if st.button("🗑️ Clear All History"):
+            st.session_state.script_history = []
+            st.rerun()
 
 with tab_settings:
     st.title("Settings")
