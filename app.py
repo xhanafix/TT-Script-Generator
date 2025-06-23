@@ -29,7 +29,7 @@ def save_settings(settings):
     with open(SETTINGS_FILE, 'w') as f:
         json.dump(settings, f, indent=4)
 
-def add_to_history(topic, video_length, script, timestamp=None):
+def add_to_history(topic, video_length, script, avatar=None, timestamp=None):
     """Adds a generated script to history."""
     if timestamp is None:
         timestamp = datetime.now()
@@ -38,6 +38,7 @@ def add_to_history(topic, video_length, script, timestamp=None):
         'timestamp': timestamp,
         'topic': topic,
         'video_length': video_length,
+        'avatar': avatar,  # Store avatar/persona
         'script': script
     }
     st.session_state.script_history.append(history_item)
@@ -166,7 +167,7 @@ Use these colloquial features in your script:
 - Make sure the language sounds natural and conversational, like how young Malaysians actually speak.
 """
 
-def generate_script(topic, video_length):
+def generate_script(topic, video_length, avatar=None):
     """Generates the TikTok script using the configured AI provider."""
     if not st.session_state.get("api_key"):
         st.error("Please enter your API key in the Settings tab.")
@@ -181,6 +182,8 @@ def generate_script(topic, video_length):
         model_name = st.session_state.model
         
         user_prompt = f"Create a {video_length}-second TikTok script about {topic}."
+        if avatar:
+            user_prompt += f"\n\nThe script should be tailored for this product/service avatar/persona: {avatar}"
 
         if provider == "OpenAI":
             client = openai.OpenAI(api_key=api_key)
@@ -193,7 +196,7 @@ def generate_script(topic, video_length):
                 temperature=0.7,
             )
             script = response.choices[0].message.content
-            add_to_history(topic, video_length, script)
+            add_to_history(topic, video_length, script, avatar)
             return script, True
         
         elif provider == "OpenRouter":
@@ -214,7 +217,7 @@ def generate_script(topic, video_length):
                 }
             )
             script = response.choices[0].message.content
-            add_to_history(topic, video_length, script)
+            add_to_history(topic, video_length, script, avatar)
             return script, True
 
         elif provider == "Gemini":
@@ -223,7 +226,7 @@ def generate_script(topic, video_length):
             full_prompt = f"{SYSTEM_PROMPT}\n\n---\n\n{user_prompt}"
             response = model.generate_content(full_prompt)
             script = response.text
-            add_to_history(topic, video_length, script)
+            add_to_history(topic, video_length, script, avatar)
             return script, True
 
     except Exception as e:
@@ -237,13 +240,14 @@ with tab_generator:
     st.title("TikTok Script Generator")
     topic = st.text_input("Enter the topic for your TikTok video:")
     video_length = st.selectbox("Select video length (in seconds):", [15, 30, 60])
+    avatar = st.text_input("Describe your product/service avatar or persona (optional):")  # New input
 
     if st.button("Generate Script"):
         if not topic:
             st.warning("Please enter a topic.")
         else:
             with st.spinner("Generating your script..."):
-                script, success = generate_script(topic, video_length)
+                script, success = generate_script(topic, video_length, avatar)  # Pass avatar
                 if script:
                     st.subheader("Your TikTok Script:")
                     st.markdown(script)
@@ -272,6 +276,8 @@ with tab_history:
                 st.markdown(f"**Topic:** {item['topic']}")
                 st.markdown(f"**Length:** {item['video_length']} seconds")
                 st.markdown(f"**Generated:** {item['timestamp'].strftime('%Y-%m-%d %H:%M:%S')}")
+                if item.get('avatar'):
+                    st.markdown(f"**Avatar/Persona:** {item['avatar']}")  # Show avatar if present
                 st.markdown("---")
                 st.markdown(item['script'])
                 

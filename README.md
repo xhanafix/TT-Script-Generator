@@ -1,13 +1,13 @@
 # TikTok Script Generator
 
-This is a simple Streamlit web application that generates TikTok video scripts on any topic using various AI models. It is designed to help content creators quickly draft engaging and well-structured video scripts in Northern Malaysian accent (loghat utara).
+This is a simple Streamlit web application that generates TikTok video scripts on any topic using various AI models. It is designed to help content creators quickly draft engaging and well-structured video scripts in colloquial Bahasa Malaysia (bahasa pasar/Manglish).
 
 ## Features
 
 - **Multiple AI Providers**: Supports OpenAI, Gemini, and OpenRouter.
 - **Custom Models**: Flexibility to use standard models or specify a custom one.
 - **Persistent Settings**: Remembers your API provider, key, and model choice locally in a `settings.json` file.
-- **Northern Malaysian Accent**: Generates scripts in colloquial Northern Malaysian accent (loghat utara) with authentic dialect features like "hang" instead of "kau", "dok" instead of "tak", "tok" instead of "saja", etc.
+- **Colloquial Bahasa Malaysia**: Generates scripts in colloquial Bahasa Malaysia (bahasa pasar/Manglish) with authentic conversational features like "kau" or "korang" instead of "anda", "tak" instead of "tidak", "je" instead of "saja", "nak" instead of "hendak", "dah" instead of "sudah", etc.
 - **Structured Output**: Formats scripts into a clean, four-column markdown table:
     - `Timestamp`
     - `Visual`
