@@ -97,27 +97,24 @@ def create_excel_file(script, topic, video_length):
         return None
 
 def extract_voiceover_txt(script):
-    """Extracts the Voiceover column from the markdown table in the script and returns as plain text."""
+    """Extracts the Voiceover column from the markdown table in the script and returns it as plain text."""
     lines = script.strip().split('\n')
+    table_data = []
     headers = []
-    voiceover_idx = None
-    voiceover_lines = []
     for line in lines:
         if line.startswith('|') and line.endswith('|'):
             cells = [cell.strip() for cell in line[1:-1].split('|')]
-            if '---' in line:
-                continue  # skip separator
-            if not headers:
-                headers = cells
-                if 'Voiceover' in headers:
-                    voiceover_idx = headers.index('Voiceover')
-            else:
-                if voiceover_idx is not None and len(cells) > voiceover_idx:
-                    # Remove surrounding quotes if present
-                    vo = cells[voiceover_idx].strip()
-                    if vo.startswith('"') and vo.endswith('"'):
-                        vo = vo[1:-1]
-                    voiceover_lines.append(vo)
+            if '---' not in line:
+                if not headers:
+                    headers = cells
+                else:
+                    table_data.append(cells)
+    if not headers or 'Voiceover' not in headers:
+        return None
+    voiceover_idx = headers.index('Voiceover')
+    voiceover_lines = [row[voiceover_idx] for row in table_data if len(row) > voiceover_idx]
+    # Remove surrounding quotes if present
+    voiceover_lines = [v.strip('"') for v in voiceover_lines]
     return '\n'.join(voiceover_lines)
 
 # Load existing settings and store them in session state
@@ -282,18 +279,17 @@ with tab_generator:
                     if excel_content:
                         filename = f"tiktok_script_{topic.replace(' ', '_')}_{video_length}s_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
                         st.download_button(
-                            label="\ud83d\udcbe Download Excel File",
+                            label="\U0001F4E5 Download Excel File",
                             data=excel_content,
                             file_name=filename,
                             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                         )
-                    # Export Voiceover Only
-                    st.subheader("Export Voiceover Only:")
+                    # Export Voiceover to TXT
                     voiceover_txt = extract_voiceover_txt(script)
                     if voiceover_txt:
                         txt_filename = f"tiktok_voiceover_{topic.replace(' ', '_')}_{video_length}s_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
                         st.download_button(
-                            label="\ud83d\udcbe Download Voiceover Only (.txt)",
+                            label="\U0001F4DD Download Voiceover (.txt)",
                             data=voiceover_txt,
                             file_name=txt_filename,
                             mime="text/plain"
@@ -307,7 +303,7 @@ with tab_history:
     else:
         # Show history in reverse chronological order
         for i, item in enumerate(reversed(st.session_state.script_history)):
-            with st.expander(f"📝 {item['topic']} ({item['video_length']}s) - {item['timestamp'].strftime('%Y-%m-%d %H:%M:%S')}"):
+            with st.expander(f"\U0001F4DD {item['topic']} ({item['video_length']}s) - {item['timestamp'].strftime('%Y-%m-%d %H:%M:%S')}"):
                 st.markdown(f"**Topic:** {item['topic']}")
                 st.markdown(f"**Length:** {item['video_length']} seconds")
                 st.markdown(f"**Generated:** {item['timestamp'].strftime('%Y-%m-%d %H:%M:%S')}")
@@ -322,23 +318,22 @@ with tab_history:
                 if excel_content:
                     filename = f"tiktok_script_{item['topic'].replace(' ', '_')}_{item['video_length']}s_{item['timestamp'].strftime('%Y%m%d_%H%M%S')}.xlsx"
                     st.download_button(
-                        label="\ud83d\udcbe Download Excel File",
+                        label="\U0001F4E5 Download Excel File",
                         data=excel_content,
                         file_name=filename,
                         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                         key=f"download_history_{i}"
                     )
-                # Export Voiceover Only
-                st.subheader("Export Voiceover Only:")
+                # Export Voiceover to TXT
                 voiceover_txt = extract_voiceover_txt(item['script'])
                 if voiceover_txt:
                     txt_filename = f"tiktok_voiceover_{item['topic'].replace(' ', '_')}_{item['video_length']}s_{item['timestamp'].strftime('%Y%m%d_%H%M%S')}.txt"
                     st.download_button(
-                        label="\ud83d\udcbe Download Voiceover Only (.txt)",
+                        label="\U0001F4DD Download Voiceover (.txt)",
                         data=voiceover_txt,
                         file_name=txt_filename,
                         mime="text/plain",
-                        key=f"download_voiceover_{i}"
+                        key=f"download_txt_history_{i}"
                     )
                 
                 # Delete functionality
