@@ -5,6 +5,7 @@ import json
 import os
 import pandas as pd
 from datetime import datetime
+import time
 
 SETTINGS_FILE = "settings.json"
 
@@ -254,6 +255,76 @@ def generate_script(topic, video_length, avatar=None):
         st.error(f"An error occurred: {e}")
         return None, False
 
+def generate_description_and_hashtags(script, topic):
+    """Uses the AI provider to generate a short description and relevant hashtags for the script."""
+    provider = st.session_state.api_provider
+    api_key = st.session_state.api_key
+    model_name = st.session_state.model
+    prompt = (
+        f"Given the following TikTok script about '{topic}', "
+        "write a short, catchy description (1-2 sentences, in colloquial Bahasa Malaysia) "
+        "and suggest 3-6 relevant TikTok hashtags (in Bahasa Malaysia and/or English, separated by spaces, no # in description, only in hashtags). "
+        "Format:\nDescription: ...\nHashtags: #tag1 #tag2 #tag3 ...\n\nScript:\n{script}"
+    )
+    try:
+        if provider == "OpenAI":
+            client = openai.OpenAI(api_key=api_key)
+            response = client.chat.completions.create(
+                model=model_name,
+                messages=[
+                    {"role": "system", "content": "You are a helpful assistant for social media content."},
+                    {"role": "user", "content": prompt}
+                ],
+                temperature=0.7,
+                max_tokens=200
+            )
+            return response.choices[0].message.content.strip()
+        elif provider == "OpenRouter":
+            client = openai.OpenAI(
+                api_key=api_key,
+                base_url="https://openrouter.ai/api/v1"
+            )
+            response = client.chat.completions.create(
+                model=model_name,
+                messages=[
+                    {"role": "system", "content": "You are a helpful assistant for social media content."},
+                    {"role": "user", "content": prompt}
+                ],
+                temperature=0.7,
+                max_tokens=200,
+                extra_headers={
+                    "HTTP-Referer": "http://localhost:8501",
+                    "X-Title": "TikTok Script Generator"
+                }
+            )
+            return response.choices[0].message.content.strip()
+        elif provider == "Gemini":
+            genai.configure(api_key=api_key)
+            model = genai.GenerativeModel(model_name)
+            response = model.generate_content(prompt)
+            return response.text.strip()
+    except Exception as e:
+        st.error(f"Error generating description/hashtags: {e}")
+        return ""
+
+def generate_script_batch(topic, video_length, avatar=None, n_variations=7):
+    """Generates a batch of TikTok scripts (7 variations) using chunking to avoid token/response length issues. Also generates description and hashtags for each."""
+    scripts = []
+    desc_tags = []
+    for i in range(n_variations):
+        # Add a variation hint to the prompt for more diversity
+        variation_avatar = avatar
+        if avatar:
+            variation_avatar = f"{avatar} (Variation {i+1})"
+        script, success = generate_script(topic, video_length, variation_avatar)
+        if script:
+            scripts.append(script)
+            desc_tag = generate_description_and_hashtags(script, topic)
+            desc_tags.append(desc_tag)
+        else:
+            desc_tags.append("")
+    return scripts, desc_tags
+
 # --- UI Setup ---
 tab_generator, tab_history, tab_settings = st.tabs(["Script Generator", "History", "Settings"])
 
@@ -267,33 +338,42 @@ with tab_generator:
         if not topic:
             st.warning("Please enter a topic.")
         else:
-            with st.spinner("Generating your script..."):
-                script, success = generate_script(topic, video_length, avatar)  # Pass avatar
-                if script:
-                    st.subheader("Your TikTok Script:")
-                    st.markdown(script)
-                    
-                    # Export functionality
-                    st.subheader("Export to Excel:")
-                    excel_content = create_excel_file(script, topic, video_length)
-                    if excel_content:
-                        filename = f"tiktok_script_{topic.replace(' ', '_')}_{video_length}s_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
-                        st.download_button(
-                            label="\U0001F4E5 Download Excel File",
-                            data=excel_content,
-                            file_name=filename,
-                            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                        )
-                    # Export Voiceover to TXT
-                    voiceover_txt = extract_voiceover_txt(script)
-                    if voiceover_txt:
-                        txt_filename = f"tiktok_voiceover_{topic.replace(' ', '_')}_{video_length}s_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
-                        st.download_button(
-                            label="\U0001F4DD Download Voiceover (.txt)",
-                            data=voiceover_txt,
-                            file_name=txt_filename,
-                            mime="text/plain"
-                        )
+            with st.spinner("Generating 7 script variations in batch..."):
+                start_time = time.time()
+                scripts, desc_tags = generate_script_batch(topic, video_length, avatar, n_variations=7)
+                elapsed = time.time() - start_time
+                if scripts:
+                    st.success(f"Scripts generated in {elapsed:.2f} seconds.")
+                    st.subheader("Your 7 TikTok Script Variations:")
+                    for idx, script in enumerate(scripts):
+                        st.markdown(f"### Variation {idx+1}")
+                        st.markdown(script)
+                        # Show description and hashtags after the table
+                        if desc_tags[idx]:
+                            st.markdown(f"**Suggested Description & Hashtags:**\n\n{desc_tags[idx]}")
+                        # Export functionality
+                        st.subheader("Export to Excel:")
+                        excel_content = create_excel_file(script, topic, video_length)
+                        if excel_content:
+                            filename = f"tiktok_script_{topic.replace(' ', '_')}_{video_length}s_var{idx+1}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+                            st.download_button(
+                                label="\U0001F4E5 Download Excel File",
+                                data=excel_content,
+                                file_name=filename,
+                                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                                key=f"download_excel_var_{idx}"
+                            )
+                        # Export Voiceover to TXT
+                        voiceover_txt = extract_voiceover_txt(script)
+                        if voiceover_txt:
+                            txt_filename = f"tiktok_voiceover_{topic.replace(' ', '_')}_{video_length}s_var{idx+1}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
+                            st.download_button(
+                                label="\U0001F4DD Download Voiceover (.txt)",
+                                data=voiceover_txt,
+                                file_name=txt_filename,
+                                mime="text/plain",
+                                key=f"download_txt_var_{idx}"
+                            )
 
 with tab_history:
     st.title("Generated Scripts History")
